@@ -29,7 +29,7 @@ media					db	0xF0	; Bit 0 - sides 0=1, 1=2
 									; Rest is unsused, always 1
 sectors_per_fat			dw	9
 sectors_per_track		dw	18
-heads_per_cylinder		dw	2
+sides					dw	2
 hidden_sectors			dd	0
 total_sectors_big		dd	0		; No idea, what this is and why is it zero
 drive_number			dw	0		; Floppy's drive nr is 0
@@ -43,12 +43,12 @@ main:
 	;----------------------------------
 	; Setup segment registers
 	;						boot			stack	 		buffer, or whatever
-	;	|--	07C0h	--|--	0200h	--|--	0200h	--|--	Starts at 0BC0h		--|
-	MOV AX, 09C0h	; Exactly above the bootloader
+	;	|--	07C0h	--|--	0200h	--|--	0400h	--|--	Starts at 0DC0h		--|
+	MOV AX, 0BC0h	; Exactly above the bootloader
 	CLI
 
 	MOV SS, AX
-	MOV SP, 0200h	; 512 bytes has to be enough
+	MOV SP, 0400h	; 1024 bytes has to be enough
 	
 	STI
 	
@@ -77,7 +77,7 @@ main:
 	MOV [sectors_per_track], CX	; Sector numbers start at 1
 	MOVZX DX, DH				; Maximum head number
 	ADD DX, 1					; Head numbers start at 0 - add 1 for total
-	MOV [heads_per_cylinder], DX
+	MOV [sides], DX
 
 .no_change:
 	XOR EAX, EAX				; Needed for some older BIOSes
@@ -103,7 +103,7 @@ main:
 	STC
 	INT 13h
 	JNC .search_stage_two		; If CF not set, we're good
-	
+
 	XOR AX, AX					; Reset
 	INT 13h
 	
@@ -251,9 +251,9 @@ finished:
 ; lba_to_chs
 ; IN:	AX		- LBA
 ;
-; OUT:	DL 		- Sector
-;		DH		- Head
+; OUT:	CL 		- Sector
 ;		CH		- Track
+;		DH		- Head
 ;		
 ;		This way the registers are set up for the interrupt 13h
 ;		
@@ -267,12 +267,43 @@ lba_to_chs:
 	MOV CL, DL							; Sector
 	; AX contains now the (LBA / sectors per track)
 	XOR DX, DX
-	DIV WORD [heads_per_cylinder]		; (sectors/track) %  nr of heads
+	DIV WORD [sides]					; (sectors/track) %  nr of heads
 	MOV DH, DL							; Head
 	MOV CH, AL							; Track
 
 	POP AX
 	
+	MOV DL, [boot_device]
+	
+	RET
+
+; ------------------------------------------------------------------
+; print_number
+; IN: BL - Number
+; 
+; ------------------------------------------------------------------
+print_number:
+	PUSH AX
+	PUSH BX
+	
+	MOV AH, 0Eh		; Function
+	
+	SHR BL, 4
+	ADD BL, 30h
+	MOV AL, BL
+	INT 10h
+	
+	POP BX
+	PUSH BX
+	
+	AND BL, 0Fh
+	
+	ADD BL, 30h
+	MOV AL, BL
+	INT 10h
+	
+	POP BX
+	POP AX
 	RET
 
 ; ------------------------------------------------------------------
@@ -280,15 +311,15 @@ lba_to_chs:
 ; IN/OUT NOTHING
 ; Prints a number to the console via BIOS call.
 ; The number is increased every time its called.
-; Max calls: 9, after it will be invalid mnumber.
 ; ------------------------------------------------------------------
 stage_passed:
-	MOV AL, [stage_count]
-	MOV AH, 0Eh
-	INT 10h
+	PUSH BX
+	MOV BL, [stage_count]
+	CALL print_number
 	
-	INC AL
-	MOV [stage_count], AL
+	INC BL
+	MOV [stage_count], BL
+	POP BX
 	RET
 
 boot_failure:
@@ -300,9 +331,9 @@ boot_failure:
 ;	DATA
 ; ------------------------------------------------------------------
 
-BUFFER							equ	0BC0h
+BUFFER							equ	0DC0h
 
-stage_count						db	30h	;0
+stage_count						db	0
 boot_device						db	0
 cluster							dw	0
 pointer							dw	0
