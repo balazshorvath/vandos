@@ -44,7 +44,7 @@ main:
 	; Setup segment registers
 	;						boot			stack	 		buffer, or whatever
 	;	|--	07C0h	--|--	0200h	--|--	0400h	--|--	Starts at 0DC0h		--|
-	MOV AX, 0BC0h	; Exactly above the bootloader
+	MOV AX, 09C0h	; Exactly above the bootloader
 	CLI
 
 	MOV SS, AX
@@ -95,7 +95,7 @@ main:
 	MOV AL, 14					; Amount
 								; 244 entries 32 bytes each
 
-	MOV CX, 5
+	;MOV CX, 5
 	
 .read_root:
 	PUSHA
@@ -108,14 +108,15 @@ main:
 	INT 13h
 	
 	POPA
-	LOOP .read_root
+	;LOOP .read_root
 	JMP boot_failure
 .search_stage_two:
 	; Load root dir into memory (2)
 	CALL stage_passed
 	
 	POPA
-
+	MOV AX, DS
+	MOV ES, AX
 	MOV DI, BUFFER				; ES is already set properly
 	
 	MOV CX, [root_entries]
@@ -171,21 +172,25 @@ main:
 	CALL stage_passed
 	
 	POPA
-	; Buffer + (9 * 512) is the place to load the second stage
+	; 07C0 + Buffer + (9 * 512) = 1FC0
+	; is the place to load the second stage
 	; We dont want to override anything
 	; Starting from offset 0
-	MOVZX AX, [sectors_per_fat]
-	MUL WORD [bytes_per_sector]
-	ADD AX, BUFFER
+	MOV AX, 1FC0h
 	MOV ES, AX
 	
 	XOR BX, BX
 	MOV WORD [pointer], BX			; Just to be sure
 	
 	MOV AH, 02h						; Function
-	MOV AL, [sectors_per_cluster]	; Amount
+	MOV AL, 1						; Amount
 	PUSH AX							; Will be used later
-	
+; Info from MikeOS bootloader:
+; FAT cluster 0 = media descriptor = 0F0h
+; FAT cluster 1 = filler cluster = 0FFh
+; Cluster start = ((cluster number) - 2) * SectorsPerCluster + (start of user)
+;               = (cluster number) + 31
+
 .read_cluster:
 	MOV AX, WORD [cluster]
 	ADD AX, 31						; Cluster to LBA
@@ -207,6 +212,7 @@ main:
 	
 .next_cluster:
 	MOV AX, [cluster]
+	XOR DX, DX
 	MOV BX, 3
 	MUL BX
 	SHR AX, 1			; 3*cluster/2
@@ -228,9 +234,7 @@ main:
 	CMP DX, 0FF8h		; Means, its EOF (FAT12)
 	JAE finished
 	
-	MOVZX AX, [sectors_per_cluster]
-	MUL WORD [bytes_per_sector]
-	ADD WORD [pointer], AX
+	ADD WORD [pointer], 512
 	JMP .read_cluster
 	
 	
@@ -330,8 +334,8 @@ boot_failure:
 ; ------------------------------------------------------------------
 ;	DATA
 ; ------------------------------------------------------------------
-
-BUFFER							equ	0DC0h
+; Buffer is 0600h, because DS and ES both are set to 07C0h
+BUFFER							equ	0600h
 
 stage_count						db	0
 boot_device						db	0
