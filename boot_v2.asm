@@ -115,8 +115,6 @@ main:
 	CALL stage_passed
 	
 	POPA
-	MOV AX, DS
-	MOV ES, AX
 	MOV DI, BUFFER				; ES is already set properly
 	
 	MOV CX, [root_entries]
@@ -128,7 +126,7 @@ main:
 	MOV SI, stage_two_name
 	MOV CX, 11					; Set filename and test for 11 bytes
 	
-	REP CMPSB
+	REP CMPSB					; DI will be at offset 11 (later ES:DI + 15)
 	JE .found_stage_two
 	
 	ADD AX, 32
@@ -144,7 +142,7 @@ main:
 	CALL stage_passed
 	
 	POP CX
-	MOV AX, WORD [ES:DI + 0Fh]
+	MOV AX, WORD [ES:DI + 0Fh]	; First cluster
 	MOV WORD [cluster], AX
 	
 	MOV AX, 1					; Now load first FAT
@@ -152,7 +150,7 @@ main:
 	
 	MOV AH, 2					; Function
 	MOV AL, [sectors_per_fat]	; Amount
-	MOV CX, 5
+	;MOV CX, 5
 	
 .read_fat:
 	PUSHA
@@ -165,7 +163,7 @@ main:
 	INT 13h
 	
 	POPA
-	LOOP .read_fat
+	;LOOP .read_fat
 	JMP boot_failure
 .load_stage_two:
 	; FAT is in memory (4)
@@ -194,6 +192,7 @@ main:
 .read_cluster:
 	MOV AX, WORD [cluster]
 	ADD AX, 31						; Cluster to LBA
+	
 	CALL lba_to_chs
 	
 	MOV BX, WORD [pointer]
@@ -207,31 +206,33 @@ main:
 	
 	XOR AX, AX					; Reset
 	INT 13h
+	
 	; TODO: MAX TRIES
 	JMP .read_cluster
 	
 .next_cluster:
 	MOV AX, [cluster]
-	XOR DX, DX
-	MOV BX, 3
-	MUL BX
-	SHR AX, 1			; 3*cluster/2
+	MOV DX, AX
+	SHR DX, 1			; cluster/2
+	ADD AX, DX			; (3/2) * CLUSTER
 	
 	MOV SI, BUFFER
 	ADD SI, AX
-	MOV DX, WORD [DS:SI]
+	MOV AX, WORD [DS:SI]
 	; If cluster is even, drop last 4 bits of word
 	; with next cluster; if odd, drop first 4 bits
-	AND AX, 1
+	MOV DX, [cluster]
+	
+	AND DX, 1
 	JZ .even
 	
-	SHR DX, 4
+	SHR AX, 4
 	JMP SHORT .next_cluster_cont
 .even:
-	AND DX, 0FFFh
+	AND AX, 0FFFh
 .next_cluster_cont:
-	MOV WORD [cluster], DX
-	CMP DX, 0FF8h		; Means, its EOF (FAT12)
+	MOV WORD [cluster], AX
+	CMP AX, 0FF8h		; Means, its EOF (FAT12)
 	JAE finished
 	
 	ADD WORD [pointer], 512
@@ -241,14 +242,8 @@ main:
 finished:
 	; File loaded (5)
 	CALL stage_passed
-	
-	MOVZX AX, [sectors_per_fat]
-	MUL WORD [bytes_per_sector]
-	ADD AX, BUFFER
-	
-	PUSH AX
-	PUSH 0
-	RETF	; RETF : Pops IP, then CS
+	POP AX
+	JMP 1FC0h:0000h
 	
 	
 ; ------------------------------------------------------------------
