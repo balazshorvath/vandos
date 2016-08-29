@@ -1,23 +1,26 @@
 
 ; ------------------------------------------------------------------
-; Very first bootloader by Oryk
-; Some of the source are from this guide:
-; http://www.brokenthorn.com/Resources/OSDev0.html
+; VandOS Stage Two Bootloader Version 0.1
+;
+; The current version supports FAT12. Later versions will use 
+; better FSs.
+;
+; The program will be loaded by STGONE @ 1FC0h
+;
+; The goals of Stage Two:
+; 		- Prepare the CPU to switch to protected mode
+;
+;
+; These projects helped me develop the program:
+; 		http://www.brokenthorn.com/Resources/OSDev0.html
+;
+; By Oryk
 ; ------------------------------------------------------------------
 
-ORG 0
+ORG 
 BITS 16
 
 start:
-	CLI
-	PUSH CS		; Data segment must be the same
-	POP DS		; as the code segment.
-	
-	MOV SI, stage_two_welcome
-	CALL print_string
-	
-	CLI
-	HLT
 
 ; ------------------------------------------------------------------
 ; print_string
@@ -29,6 +32,7 @@ start:
 ;		AL - Character
 ; ------------------------------------------------------------------
 print_string:
+	PUSHA
 	LODSB		; Load from SI to AL
 	OR AL, AL	; 0 ? finished
 	JZ .finished
@@ -37,6 +41,7 @@ print_string:
 	JMP print_string
 	
 .finished:
+	POPA
 	RET
 	
 	

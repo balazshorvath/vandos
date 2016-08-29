@@ -1,9 +1,18 @@
 
 ; ------------------------------------------------------------------
+; VandOS Stage One Bootloader Version 1.0
+;
+; The current version supports FAT12. Later versions will use 
+; better FSs.
+;
+; This programs loads the Stage Two Bootloader of VandOS 
+; in the root directory under the name : STGTWO.BIN.
+; The STGTWO.BIN will be executed at 1FC0h.
+;
 ; Very first bootloader by Oryk
-; Some of the source are from this guide:
-; http://www.brokenthorn.com/Resources/OSDev0.html
-; + MikeOS
+; These projects helped me develop the program:
+; 		http://www.brokenthorn.com/Resources/OSDev0.html
+; 		MikeOS (http://mikeos.sourceforge.net/)
 ; ------------------------------------------------------------------
 
 
