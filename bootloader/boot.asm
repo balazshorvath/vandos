@@ -48,6 +48,9 @@ volume_id				dd	0xA0A1A2A1; This is a unique identifier, when formatted, it's ge
 volume_label			db	"VANDOS     "; 11 bytes
 file_system				db	"FAT12   "
 
+; Buffer is 0600h, because DS and ES both are set to 07C0h
+%define	BUFFER	0600h
+
 main:
 	;----------------------------------
 	; Setup segment registers
@@ -338,8 +341,6 @@ boot_failure:
 ; ------------------------------------------------------------------
 ;	DATA
 ; ------------------------------------------------------------------
-; Buffer is 0600h, because DS and ES both are set to 07C0h
-BUFFER							equ	0600h
 
 stage_count						db	0
 boot_device						db	0
