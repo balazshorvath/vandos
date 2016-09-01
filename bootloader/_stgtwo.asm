@@ -27,7 +27,7 @@ main:
 	
 ; ------------------------------------------------------------------
 ; fat12_load_fat
-; IN:	AX	- Size of FAT (sectors)
+; IN:	BX	- Buffer
 ;		
 ; OUT:	Data @mem address
 ;
@@ -35,21 +35,71 @@ main:
 fat12_load_fat:
 	PUSHA
 	
+	MOV AX, 1	
+	MOV CL, 9
 	
+	CALL load_floppy_sector
 	
 	POPA
 	RET
 ; ------------------------------------------------------------------
+; fat12_find_file
+; IN:	SI 	- String
+;		DI	- Root dir starting address
+;
+; OUT:	AX	- Cluster
+;		CF	- Set in case of errors
+;
+; ------------------------------------------------------------------
+fat12_find_file:
+	PUSHA
+	
+	XOR AX, AX
+	MOV DX, DI
+	
+	MOV CX, 224
+	
+.check_entry:
+	PUSH CX
+	
+	MOV SI, stage_two_name
+	MOV CX, 11
+	
+	REP CMPSB
+	JE .found_file
+	
+	ADD DX, 32
+	MOV DI, DX
+	
+	POP CX
+	LOOP .check_entry
+	
+	MOV SI, [msg_search_failure]
+	CALL print_string
+	
+	POPA
+	RET
+	
+.found_file:
+	
+	POP CX
+	MOV AX, WORD [ES:DI + 0Fh]
+	
+	MOV SI, [msg_search_success]
+	CALL print_string
+	
+	POPA
+	RET
+	
+; ------------------------------------------------------------------
 ; fat12_load_root
-; IN:	AX 	- Address to load dir to
+; IN:	BX 	- Address to load dir to
 ;
 ; OUT:	Data @mem address
 ;
 ; ------------------------------------------------------------------
 fat12_load_root:
 	PUSHA
-
-	MOV BX, AX
 	
 	MOV AX, 19					; Root dir starts at logical sector 19
 	MOV CL, 14
@@ -161,14 +211,7 @@ kernel_name 					db	"KERNEL  BIN"
 
 msg_root_success				db	"Successfully loaded FAT12 root dir into memory.", 10, 13, 0
 msg_root_failure				db	"Failed to load FAT12 root dir into memory.", 10, 13, 0
+msg_search_success				db	"Found file.", 10, 13, 0
+msg_search_failure				db	"Did not find file.", 10, 13, 0
 
 
-;	TODO REMOVE THIS AND LOAD THE DATA IF NEEDED (btw it's still in memory)
-bytes_per_sector				dw	0x0200
-sectors_per_cluster				db	1
-reserved_sectors				dw	1
-number_of_fats					db	2
-root_entries					dw	244
-sectors_per_fat					dw	9
-sectors_per_track				dw	18
-sides							dw	2
