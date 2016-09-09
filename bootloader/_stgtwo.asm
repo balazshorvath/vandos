@@ -35,15 +35,19 @@ main:
 	MOV SP, 0FFFFh
 	
 	STI
-	
+	;TODO check failure
 	CALL install_gdt
 	CALL _8042_enable_a20_command
 	
 	MOV SI, msg_welcome
 	CALL print_string
 	
+	MOV BX, 5000h
 	CALL fat12_load_root
 	
+	MOV DI, 5000h
+	MOV SI, kernel_name
+	CALL fat12_find_file
 	
 ; ------------------------------------------------------------------
 ;	FUNCTIONS
